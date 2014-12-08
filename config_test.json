@@ -1,0 +1,41 @@
+{
+	"XMPP": {
+		"server": "andy",
+		"port": 5222,
+		"user": "recommender",
+		"pw": "123",
+		"publishNode": "presence",
+		"screenUser": "care_screen",
+		"loggerUser": "logger",
+		"certificate": "server.crt"
+	},
+	"Drupal": {
+		"server": "care-test.multimedia.hs-augsburg.de",
+	},
+	"MongoDB": {
+		"server": "caretablet1",
+		"port": 27017,
+		"dbNameUserModel": "usermodelDB",
+		"collectionNameUserModel": "userAnswers",
+		"dbNameSensors": "sensordataDB"
+	}
+	"RecSys":{
+		"filterByCategory": false,
+		"chooseSingleRecommendation": true 
+	}
+	"others":{
+		"language": "de",
+		"solarAltitudeUpdateInterval": 24, 
+		"weatherConditionUpdateInterval": 60,
+		"userMoodUpdateInterval": 120,
+		"contentIDRequestMood": 34,
+		"tempRecHistoryCleanupInterval": 60,
+		"maximumDisplayCountRec": 3
+	}
+	"debugging":{
+		"useXMPPConnection": true,
+		"useMongoDBConnection": false,
+		"getTriggerFromJSONFile": true,
+		"debuglevel": 3
+	}
+}

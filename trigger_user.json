@@ -1,0 +1,30 @@
+{
+  "presence": [
+    {
+      "avgDist": 251.25,
+      "date": {
+        "$date": "2014-11-15T14:21:07.369Z"
+      },
+      "sensor": {
+        "_id_sensor": {
+          "$oid": "546517d52936609d4a9408d6"
+        },
+        "sensorType": "userIRdistance",
+        "positionType": "wall",
+        "positionID": 0,
+        "adminSoftware": "arduinoApp"
+      },
+      "room": {
+        "_id_room": {
+          "$oid": "546517d52936609d4a9408d5"
+        },
+        "roomType": "livingroom",
+        "roomID": 0
+      }
+    }
+  ],
+  "triggers": [],
+  "date": {
+    "$date": "2014-11-15T14:21:07.381Z"
+  }
+}

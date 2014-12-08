@@ -1,0 +1,59 @@
+{
+  "presence": [
+    {
+      "avgDist": 307,
+      "date": {
+        "$date": "2014-11-15T14:15:31.194Z"
+      },
+      "sensor": {
+        "_id_sensor": {
+          "$oid": "546517d52936609d4a9408d6"
+        },
+        "sensorType": "userIRdistance",
+        "positionType": "wall",
+        "positionID": 0,
+        "adminSoftware": "arduinoApp"
+      },
+      "room": {
+        "_id_room": {
+          "$oid": "546517d52936609d4a9408d5"
+        },
+        "roomType": "livingroom",
+        "roomID": 0
+      }
+    }
+  ],
+  "triggers": [
+    {
+      "badRoomClimate": [
+        {
+          "room": {
+            "_id_room": {
+              "$oid": "546517d52936609d4a9408d5"
+            },
+            "roomID": 0,
+            "roomType": "livingroom"
+          },
+          "avgValues": {
+            "aq": 465.36507936507934,
+            "temp": 15.644094488188989,
+            "hum": 72.00472440944881
+          },
+          "date": {
+            "$date": "2014-11-15T14:15:31.231Z"
+          },
+          "ratings": {
+            "total": 0.6666666666666667,
+            "reliability": 1,
+            "aq": 1,
+            "temp": 0,
+            "hum": 0
+          }
+        }
+      ]
+    }
+  ],
+  "date": {
+    "$date": "2014-11-15T14:15:31.204Z"
+  }
+}
