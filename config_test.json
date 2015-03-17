@@ -13,29 +13,58 @@
 		"server": "care-test.multimedia.hs-augsburg.de",
 	},
 	"MongoDB": {
-		"server": "caretablet1",
+		"server": "127.0.0.1",
 		"port": 27017,
 		"dbNameUserModel": "usermodelDB",
 		"collectionNameUserModel": "userAnswers",
-		"dbNameSensors": "sensordataDB"
+		"dbNameSensors": "sensordataDB",
+		"dbNameCases": "caseDB",
+		"collectionNameCases": "caseCollection"
 	}
 	"RecSys":{
 		"filterByCategory": false,
-		"chooseSingleRecommendation": true 
+		"chooseSingleRecommendation": false, 
+		"chooseCaseBasedRecommendation": true 
+	}
+	"CaseRating":{
+		"casesEqualThreshold": 12,
+		"noCaseData": 10,
+		"missingInfo": 2,
+		"positiveRating": 4,
+		"negativeRating": -4,
+		"neutralRating": 0,
+		"lightConditionOutdoorsEqual": 4,
+		"lightConditionOutdoorsDifferent": 0,
+		"moodEqual": 4,
+		"moodSimilar": 2,
+		"moodDifferent": 0,
+		"weatherConditionEqual": 4,
+		"weatherConditionSimilar": 3,
+		"weatherConditionDiverging": 2,
+		"weatherConditionDifferent": 0,
+		"weatherConditionOpposite": 0,
+		"daytimeEqual": 4,
+		"daytimeSimilar": 3,
+		"daytimeDifferent": 2,
+		"daytimeOpposite": 0
 	}
 	"others":{
 		"language": "de",
 		"solarAltitudeUpdateInterval": 24, 
-		"weatherConditionUpdateInterval": 60,
+		"weatherConditionUpdateInterval": 0,
 		"userMoodUpdateInterval": 120,
 		"contentIDRequestMood": 34,
 		"tempRecHistoryCleanupInterval": 60,
 		"maximumDisplayCountRec": 3
 	}
 	"debugging":{
-		"useXMPPConnection": true,
-		"useMongoDBConnection": false,
+		"useLocalInterface": true,
+		"useXMPPConnection": false,
+		"useMongoDBConnection": true,
 		"getTriggerFromJSONFile": true,
+		"getSunTimesFromJSONFile": true,
+		"useRandomWeather": true,
+		"useRandomTime": true,
 		"debuglevel": 3
 	}
 }

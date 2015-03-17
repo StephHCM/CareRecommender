@@ -84,4 +84,18 @@ public class Recommendation {
 		return this.lastContext;
 	}
 	
+	public boolean equals(Object obj){
+		if(obj.getClass() == Recommendation.class){
+			Recommendation rec = (Recommendation)obj;
+			if(rec.getID().equals(this.getID())){
+				return true;
+			}
+			else{
+				return false;
+			}
+		}
+		else{
+			return false;
+		}
+	}
 }

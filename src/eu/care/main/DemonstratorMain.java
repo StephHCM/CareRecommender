@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Random;
 import java.util.Vector;
 import java.util.concurrent.CountDownLatch;
 
@@ -20,14 +22,14 @@ import eu.care.user.UserModel;
 
 /**
  * 
- * @author Stephan Hammer
+ * @author Stephan Hammer, Alexander Diefenbach
  *
  */
 public class DemonstratorMain {
 	
 	//config file
 	public String configFile;
-	private JSONObject jsonConfig;
+	public JSONObject jsonConfig;
 
 	//Helper
 	public RecSysLogger myLogger;
@@ -39,7 +41,10 @@ public class DemonstratorMain {
 	private DatabaseConnection dbConnection;
 	private static boolean shutdown = false;
 	private String serverUri = "";
-
+	private String sensorDB = "";
+	public String caseDB = "";
+	public String caseCollection = "";
+	
 	//Context Information
 	public HashMap<String, String> contextInformation;
 	
@@ -51,7 +56,7 @@ public class DemonstratorMain {
 	private int userMoodUpdateInterval = 120; //in minutes
 	
 	//Recommender System
-	private Vector<JSONObject> recommendationsToShow;
+	private Vector<Recommendation> recommendationsToShow;
 	private Vector<Recommendation> possibleRecommendations;
 	public HashMap<String, Recommendation> recommendationsHistory;
 	public Vector<String> possibleCategories;
@@ -64,9 +69,17 @@ public class DemonstratorMain {
 	public static CountDownLatch latch_wait_shutdown = new CountDownLatch(2);
 
 	// development helper
+	public boolean useLocalInterface = false;
 	public boolean useXMPPConnection = true;
 	public boolean useMongoDBConnection = true;
 	private boolean getTriggerFromJSONFile = false;
+	private boolean getSunTimesFromJSONFile = false;
+	private boolean useRandomWeather = false;
+	private boolean useRandomTime = false;
+	
+	private LocalInterface GUI = null;
+	
+	private Random random = new Random(System.currentTimeMillis());
 
 	public DemonstratorMain(String configFile) {
 
@@ -88,10 +101,18 @@ public class DemonstratorMain {
 		
 		//load settings from config-file
 		serverUri = ((JSONObject)jsonConfig.get("Drupal")).get("server").toString();
+		sensorDB = ((JSONObject)jsonConfig.get("MongoDB")).get("dbNameSensors").toString();
+		caseDB = ((JSONObject)jsonConfig.get("MongoDB")).get("dbNameCases").toString();
+		caseCollection = ((JSONObject)jsonConfig.get("MongoDB")).get("collectionNameCases").toString();
+		
 		//for debugging and offline testing
+		useLocalInterface = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("useLocalInterface").toString());
 		useXMPPConnection = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("useXMPPConnection").toString());
 		useMongoDBConnection = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("useMongoDBConnection").toString());
 		getTriggerFromJSONFile = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("getTriggerFromJSONFile").toString());
+		getSunTimesFromJSONFile = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("getSunTimesFromJSONFile").toString());
+		useRandomWeather = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("useRandomWeather").toString());
+		useRandomTime = Boolean.parseBoolean(((JSONObject)jsonConfig.get("debugging")).get("useRandomTime").toString());
 		Utils.systemDebugLevel = ((Long)((JSONObject)jsonConfig.get("debugging")).get("debuglevel")).intValue();
 		
 		// context update intervals (stored in config-file)
@@ -128,6 +149,13 @@ public class DemonstratorMain {
 			if (shutdown) return;
 		}
 		
+		//Create interface on local machine if desired
+		if (useLocalInterface)
+		{
+			GUI = new LocalInterface(this);
+			GUI.disableButtons();
+		}
+		
 		// only for debugging: comment out the needed trigger message
 		if (getTriggerFromJSONFile) {
 			System.out.println("-------------GET TRIGGER MESSAGE FROM FILE-------------");
@@ -155,7 +183,6 @@ public class DemonstratorMain {
 		try {
 			latch_wait_XMPP.await();
 		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -178,28 +205,38 @@ public class DemonstratorMain {
 		// get further context information to get appropriate recommendations: daytime, light conditions (outside), weather, user mood
 		else if (contextInformation.get("user_presence").equals("user_present")) {
 			// get current daytime (morning, forenoon, lunchtime, afternoon, evening, night)
-			LocalTime time = LocalTime.now();
+			LocalTime time;
+			if(useRandomTime){
+				time = LocalTime.of(random.nextInt(24), random.nextInt(60));
+			}
+			else{
+				time = LocalTime.now();
+			}
 			contextInformation.put("daytime", new TimeInterpreter().getCurrentDayTime(time));
-	
-			//get sunrise, sunset and weather condition from MongoDB
-			String sensorDB = ((JSONObject)jsonConfig.get("MongoDB")).get("dbNameSensors").toString();
 			
 			// get current light conditions (Outdoors)
-			contextInformation.put("lightConditionOutdoors", context.getCurrentLightConditions(this, sensorDB));
+			contextInformation.put("lightConditionOutdoors", context.getCurrentLightConditions(this, sensorDB, getSunTimesFromJSONFile, time));
 			
 			// get weather condition
-			contextInformation.put("weatherCondition", context.getCurrentWeatherCondition(this, sensorDB));
+			contextInformation.put("weatherCondition", context.getCurrentWeatherCondition(this, sensorDB, useRandomWeather));
 	
+			//Update GUI if applicable
+			if(useLocalInterface)
+			{
+				GUI.setTime(time.toString());
+				GUI.setWeather(contextInformation.get("weatherCondition"));
+			}
+			
 			// get user mood
 			//time since last update 
 			long diffInMinutes = Duration.between(user.getLastUpdateMood(), LocalDateTime.now(Clock.systemUTC())).toMinutes();
-
 			//if mood is unknown or "older" than interval-time
 			if (user.getMood().equals("") || diffInMinutes > user.getUpdateInterval()) {
 				requestUserMood();
 			}
 			else{
 				contextInformation.put("userMood", user.getMood());
+				if(useLocalInterface) GUI.setMood(user.getMood());
 				reactToCurrentContext(contextInformation);
 			}
 		}
@@ -270,8 +307,12 @@ public class DemonstratorMain {
 			// Filter recommendations
 			boolean chooseSingleCategory = Boolean.parseBoolean(((JSONObject)jsonConfig.get("RecSys")).get("filterByCategory").toString());
 			boolean chooseSingleRecommendation = Boolean.parseBoolean(((JSONObject)jsonConfig.get("RecSys")).get("chooseSingleRecommendation").toString());
+			boolean chooseCaseBasedRecommendation = Boolean.parseBoolean(((JSONObject)jsonConfig.get("RecSys")).get("chooseCaseBasedRecommendation").toString());
 			
-			if(chooseSingleRecommendation){
+			if(chooseCaseBasedRecommendation && useMongoDBConnection){
+				recommendationsToShow = recommenderFilter.chooseCaseBasedRecommendation(possibleRecommendations, contextInformation);
+			}
+			else if(chooseSingleRecommendation){
 				recommendationsToShow = recommenderFilter.chooseRandomRecommendation(possibleRecommendations, contextInformation);
 			}
 			else if(chooseSingleCategory){
@@ -280,9 +321,14 @@ public class DemonstratorMain {
 			else{
 				recommendationsToShow = recommenderFilter.useNoFilter(possibleRecommendations);
 			}
-
+			
+			//Convert recommendations to JSON
+			Vector<JSONObject>jsonRecommendationsToShow = new Vector<JSONObject>();
+			for(Recommendation rec : recommendationsToShow){
+				jsonRecommendationsToShow.add(rec.getJsonRepresentation());
+			}
 			//send chosen recommendations to output device
-			sendContentToOutputDevice(recommendationsToShow, "recommendations");
+			sendContentToOutputDevice(jsonRecommendationsToShow, "recommendations");
 		}
 	}
 
@@ -296,7 +342,6 @@ public class DemonstratorMain {
 				askForMoodContentInArray = (JSONArray) jsonParser.myParser.parse(jsonAskForMoodContent);
 				askForMoodContent = (JSONObject) askForMoodContentInArray.get(0);
 			} catch (ParseException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 				
@@ -314,12 +359,20 @@ public class DemonstratorMain {
 		}
 		//for debugging without care_screen or output on other devices such as robots
 		else{
-			Utils.printWithDate("Sent a " + type  + " to output device. json-representation: " + contentToShow.toString(), Utils.DEBUGLEVEL.DEBUG);
-			
+			Utils.printWithDate("Sent " + type  + " to output device. json-representation: " + contentToShow.toString(), Utils.DEBUGLEVEL.DEBUG);
+
+			String imageURL = "";
 			//if type is "survey" you have to simulate the user's answer
 			if(type.equals("surveys")){
 				//user_mood: badMood || neutralMood || goodMood
-				contextInformation.put("userMood", "neutralMood");
+				ArrayList<String> possibleMoods = new ArrayList<String>();
+				possibleMoods.add("badMood");
+				possibleMoods.add("neutralMood");
+				possibleMoods.add("goodMood");
+				String currentMood = possibleMoods.get(random.nextInt(possibleMoods.size()));
+				contextInformation.put("userMood", currentMood);
+				if(useLocalInterface) GUI.setMood(currentMood);
+				Utils.printWithDate("Current user mood: " + currentMood, Utils.DEBUGLEVEL.GENERAL);
 				reactToCurrentContext(contextInformation);
 			}
 			else if(type.equals("recommendations")){
@@ -327,13 +380,80 @@ public class DemonstratorMain {
 				Vector<String> imageNames = jsonParser.getImagesOfRecommendations(contentToShow.toString());
 				for(String imageName : imageNames){
 					//get image url
-					String imageURL = serverUri + "/care_prototype/sites/default/files/" + imageName;
+					imageURL = "http://" + serverUri + "/care_prototype/sites/default/files/" + imageName;
 					Utils.printWithDate("image url = " + imageURL, Utils.DEBUGLEVEL.DEBUG);
 				}
-				
-				//TODO Insert Java-GUI etc.
+				if(useLocalInterface){
+					GUI.setImage(imageURL);
+				}
 			}
 		}
+	}
+	
+	private void newRecommendation(){
+		//trigger message: no user in front of display
+		//triggerMessage = jsonParser.getJSONMessage("trigger_absent.json");
+			
+		//trigger message: user in front of display => recommendation needed
+		String triggerMessage = jsonParser.getJSONMessage("trigger_user.json");
+			
+		//trigger message: user in front of display + bad roomclimate => specific recommendation needed
+		//triggerMessage = jsonParser.getJSONMessage("trigger_user_roomclimate.json");
+
+		Utils.printWithDate("Trigger-Message: " + triggerMessage, Utils.DEBUGLEVEL.DEBUG);
+		if(!triggerMessage.equals("")){
+			this.gatherContextInformation(triggerMessage);
+		}
+	}
+	
+	private void rateRecommendation(int rating){
+		//Save last recommendation ID with current context and rating to case base in MongoDB
+		GUI.disableButtons();
+		if(!recommendationsToShow.isEmpty() && !contextInformation.isEmpty()){
+			HashMap<String, String> data = contextInformation;
+			data.put("RecID", recommendationsToShow.firstElement().getID());
+			data.put("UserRating", Integer.toString(rating));
+			//Find very similar past cases and remove them from the database because we have better data now.
+			Vector<Integer> recommendationID = new Vector<Integer>();
+			recommendationID.add(Integer.parseInt(recommendationsToShow.firstElement().getID()));
+			//Get all known past cases for the possible recommendation IDs
+			Vector<HashMap<String, String>> pastCases = mongoDBConnection.getCasesForRecommendationIDs(recommendationID, caseDB, caseCollection);
+			for(HashMap<String, String> pastCase : pastCases){
+				if(recommenderFilter.calculateCaseSimilarity(data, pastCase)>recommenderFilter.casesEqualThreshold){
+					Utils.printWithDate("Removing old case from database.", Utils.DEBUGLEVEL.DEBUG);
+					mongoDBConnection.deleteDBObjectByObjectId(caseDB, caseCollection, pastCase.get("_id"));
+				}
+			}
+			//Save new data to MongoDB
+			Utils.printWithDate("Saving rated recommendation to MongoDB", Utils.DEBUGLEVEL.DEBUG);
+			mongoDBConnection.insertDataDirectly(data, caseDB, caseCollection);
+			recommendationsToShow.clear();
+		}
+		//generate next recommendation
+		newRecommendation();
+	}
+	
+	//Functions to handle manual input from local interface
+	public void newRecPressed() {
+		Utils.printWithDate("User manually requested new Recommendation.", Utils.DEBUGLEVEL.GENERAL);
+		rateRecommendation(2);//Save to case base as if user rated recommendation neutrally
+		//GUI.disableButtons();
+		//newRecommendation();
+	}
+	
+	public void positivePressed() {
+		Utils.printWithDate("User rated recommendation positively.", Utils.DEBUGLEVEL.GENERAL);
+		rateRecommendation(3);
+	}
+
+	public void neutralPressed() {
+		Utils.printWithDate("User rated recommendation neutral.", Utils.DEBUGLEVEL.GENERAL);
+		rateRecommendation(2);
+	}
+
+	public void negativePressed() {
+		Utils.printWithDate("User rated recommendation negatively.", Utils.DEBUGLEVEL.GENERAL);
+		rateRecommendation(1);
 	}
 	
 	private static void createShutDownHook() {
@@ -348,16 +468,27 @@ public class DemonstratorMain {
 				Utils.printWithDate("Shutting down ...", Utils.DEBUGLEVEL.WARNING);
 
 	            //check if Objects were created
-	    		if (xmppConnection != null) 	xmppConnection.closeConnection();
-	    		if (mongoDBConnection != null) 	mongoDBConnection.closeConnection();
-
+	    		if (xmppConnection != null){
+	    			xmppConnection.closeConnection();
+	    		}
+	    		else{
+	    			Utils.printWithDate("No XMPP Connection to disconenct.", Utils.DEBUGLEVEL.WARNING);
+	    			latch_wait_shutdown.countDown();
+	    		}
+	    		if (mongoDBConnection != null){
+	    			mongoDBConnection.closeConnection();
+	    		}
+	    		else{
+	    			Utils.printWithDate("No MongoDB Connection to disconnect.", Utils.DEBUGLEVEL.WARNING);
+	    			latch_wait_shutdown.countDown();
+	    		}
+	    		
 				// waiting until XMPP disconnected -> main opens this latch
 				try {
 					latch_wait_shutdown.await();
 					
 					Utils.printWithDate("Shut down", Utils.DEBUGLEVEL.WARNING);
 				} catch (InterruptedException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 

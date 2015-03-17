@@ -52,10 +52,9 @@ public class TimeInterpreter {
 		return interpretedDaytime;
 	}
 	
-	public String getCurrentLightConditionsOutdoors(LocalTime sunrise, LocalTime sunset){
+	public String getCurrentLightConditionsOutdoors(LocalTime sunrise, LocalTime sunset, LocalTime currentTime){
 		String currentLightConditionsOutside = "";
 		
-		LocalTime currentTime = LocalTime.now(Clock.systemUTC());
 		Utils.printWithDate("Current time: " + currentTime + " Sunrise: " + sunrise + " Sunset: " + sunset, Utils.DEBUGLEVEL.DEBUG);
 		
 		if(currentTime.isBefore(sunrise)){

@@ -87,7 +87,7 @@ public class MyJSONParser {
 		JSONArray recommendations;
 		try {
 			recommendations = (JSONArray) myParser.parse(jsonRecommendations);
-			Utils.printWithDate("There are " + recommendations.size() + " recommendations.", Utils.DEBUGLEVEL.GENERAL);
+			Utils.printWithDate("JSON returned " + recommendations.size() + " recommendations.", Utils.DEBUGLEVEL.GENERAL);
 
 			if (recommendations.size() > 0) {
 				//delete categories of last recommendation generation
@@ -131,8 +131,14 @@ public class MyJSONParser {
 					else{
 						rec.setTags(new Vector<String>());
 					}
-
-					possibleRecommendations.add(rec);
+					//Don't add the same recommendation twice, no matter what JSON tells us.
+					if(!possibleRecommendations.contains(rec)){
+						possibleRecommendations.add(rec);
+						//Utils.printWithDate("Adding recommendation ID:" + rec.getID(), Utils.DEBUGLEVEL.DEBUG);
+					}
+					else{
+						//Utils.printWithDate("Already added recommendation:" + rec.getID(), Utils.DEBUGLEVEL.DEBUG);
+					}
 					
 					main.myLogger.addNewObjectToArray(main.myLogger.receivedRecArray, title, "possible recommendation");
 				}

@@ -2,12 +2,16 @@ package eu.care.communication;
 
 
 import java.util.HashMap;
+import java.util.Map;
+import java.util.Vector;
 
+import com.mongodb.BasicDBList;
 import com.mongodb.BasicDBObject;
 import com.mongodb.CommandResult;
 import com.mongodb.DB;
 import com.mongodb.DBCollection;
 import com.mongodb.DBCursor;
+import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import com.mongodb.MongoClientOptions;
 import com.mongodb.MongoTimeoutException;
@@ -16,11 +20,12 @@ import com.mongodb.ServerAddress;
 import eu.care.main.DemonstratorMain;
 import eu.care.main.Utils;
 
+import org.bson.types.ObjectId;
 import org.json.simple.JSONObject;
 
 /**
  * 
- * @author Andreas Seiderer
+ * @author Andreas Seiderer, Alexander Diefenbach
  *
  */
 public class MyMongoDBConnection {
@@ -112,6 +117,20 @@ public class MyMongoDBConnection {
 		return newDBObject;
 	}
 	
+	private HashMap<String, String> createHashMapFromDBObject(DBObject dbObject){
+		HashMap<String, String> data = new HashMap<String,String>();
+		Map<String,Object> map = dbObject.toMap();
+		ObjectId objectId = (ObjectId)map.get("_id");
+		String id = objectId.toString();
+		data.put("_id", id);
+		for(Map.Entry<String, Object> kv: map.entrySet()){
+			if(kv.getValue().getClass() == String.class){
+				data.put(kv.getKey(), (String) kv.getValue());
+			}
+		}
+		return data;
+	}
+	
 	/**
 	 * 
 	 * @param dbName
@@ -131,6 +150,37 @@ public class MyMongoDBConnection {
 		} finally {
 		   cursor.close();
 		}
+	}
+	
+	public void deleteDBObjectByObjectId(String dbName, String collection, String id){
+		DB db = mongoClient.getDB( dbName );
+		DBCollection coll = db.getCollection(collection);
+		BasicDBObject query = new BasicDBObject();
+		query.put("_id", new ObjectId(id));
+		DBObject dbObj = coll.findOne(query);
+		if(dbObj!=null)coll.remove(dbObj);
+	}
+	
+	public Vector<HashMap<String,String>> getCasesForRecommendationIDs(Vector<Integer> recommendationIDs, String dbName, String collection){
+		Vector<HashMap<String,String>> result = new Vector<HashMap<String,String>>();
+		DB db = mongoClient.getDB(dbName);
+		DBCollection coll = db.getCollection(collection);
+		BasicDBObject query = new BasicDBObject();
+		BasicDBList ids = new BasicDBList();
+		for(Integer id: recommendationIDs){
+			BasicDBObject object = new BasicDBObject("RecID", id.toString());
+			ids.add(object);
+		}
+		query = new BasicDBObject("$or", ids);
+		DBCursor cursor = coll.find(query);
+		try{
+			while(cursor.hasNext()){
+				result.add(createHashMapFromDBObject(cursor.next()));
+			}
+		} finally{
+			cursor.close();
+		}
+		return result;
 	}
 	
 	public String getCurrentSunsetSunriseTimes(String dbName) { 

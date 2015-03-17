@@ -381,7 +381,6 @@ public class MyXMPPConnection {
 	public void closeConnection() {	
 		shutdown = true;
 		boolean wasConnected = connection.isConnected();
-		
 		try {
 			connection.disconnect();
 			if (wasConnected) Utils.printWithDate("XMPP Disconnected.", Utils.DEBUGLEVEL.WARNING);
