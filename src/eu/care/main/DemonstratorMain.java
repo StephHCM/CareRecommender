@@ -409,7 +409,7 @@ public class DemonstratorMain {
 	private void rateRecommendation(int rating){
 		//Save last recommendation ID with current context and rating to case base in MongoDB
 		GUI.disableButtons();
-		if(!recommendationsToShow.isEmpty() && !contextInformation.isEmpty()){
+		if(!recommendationsToShow.isEmpty() && !contextInformation.isEmpty()&&useMongoDBConnection){
 			HashMap<String, String> data = contextInformation;
 			data.put("RecID", recommendationsToShow.firstElement().getID());
 			data.put("UserRating", Integer.toString(rating));
